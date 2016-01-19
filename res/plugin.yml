@@ -1,0 +1,10 @@
+name: StarterKits
+version: 0.2.1
+description: Provides a free kit to new players
+author: acomputerdog
+main: net.acomputerdog.starterkits.PluginStarterKits
+
+permissions:
+  starterkits.receive:
+    description: Allows player to recieve starter kits
+    default: true
