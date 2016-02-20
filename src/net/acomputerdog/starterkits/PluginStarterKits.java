@@ -2,6 +2,8 @@ package net.acomputerdog.starterkits;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -27,6 +29,9 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
     private File playerFile;
     private Set<String> kittedPlayers;
 
+    //don't reset during onEnable or onDisable
+    private boolean reloading = false;
+
     @Override
     public void onEnable() {
         try {
@@ -46,7 +51,9 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
             //don't register events or load players if they are not needed
             if (kitsEnabled) {
                 loadPlayers();
-                getServer().getPluginManager().registerEvents(this, this);
+                if (!reloading) { //don't register events twice
+                    getServer().getPluginManager().registerEvents(this, this);
+                }
             } else {
                 getLogger().info("Kits disabled; not loading players.");
             }
@@ -78,6 +85,21 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
                 p.sendMessage(ChatColor.RED + "An exception occurred giving you a starter kit!  Please report this, and/or reconnect to try again.");
             }
         }
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        switch (command.getName().toLowerCase()) {
+            case "reload":
+                reloading = true;
+                onDisable();
+                onEnable();
+                reloading = false;
+                break;
+            default:
+                sender.sendMessage(ChatColor.RED + "Unknown command!");
+        }
+        return true;
     }
 
     private void registerPlayer(String uuid) throws IOException {

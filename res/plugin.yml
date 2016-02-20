@@ -1,10 +1,19 @@
 name: StarterKits
-version: 0.2.1
+version: 0.3.0
 description: Provides a free kit to new players
 author: acomputerdog
 main: net.acomputerdog.starterkits.PluginStarterKits
+
+commands:
+  reloadkits:
+    description: Reload the plugin
+    permission: starterkits.reload
+    aliases: [reloadstarterkits, kitsreload, reloadkit]
 
 permissions:
   starterkits.receive:
     description: Allows player to recieve starter kits
     default: true
+  starterkits.reload:
+    description: Use /reload
+    default: op
