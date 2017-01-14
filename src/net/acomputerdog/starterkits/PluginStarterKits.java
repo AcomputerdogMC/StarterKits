@@ -10,6 +10,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
+import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.ItemStack;
@@ -28,9 +29,6 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
     private File configFile;
     private File playerFile;
     private Set<String> kittedPlayers;
-
-    //don't reset during onEnable or onDisable
-    private boolean reloading = false;
 
     @Override
     public void onEnable() {
@@ -51,9 +49,7 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
             //don't register events or load players if they are not needed
             if (kitsEnabled) {
                 loadPlayers();
-                if (!reloading) { //don't register events twice
-                    getServer().getPluginManager().registerEvents(this, this);
-                }
+                getServer().getPluginManager().registerEvents(this, this);
             } else {
                 getLogger().info("Kits disabled; not loading players.");
             }
@@ -69,6 +65,8 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
         configFile = null;
         playerFile = null;
         kit = null;
+
+        HandlerList.unregisterAll((JavaPlugin) this);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -90,14 +88,18 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         switch (command.getName().toLowerCase()) {
-            case "reload":
-                reloading = true;
-                onDisable();
-                onEnable();
-                reloading = false;
+            case "reloadkits":
+                if (sender.hasPermission("starterkits.reload")) {
+                    onDisable();
+                    onEnable();
+                    sender.sendMessage(ChatColor.AQUA + "Reload complete.");
+                    getLogger().info("Reloaded.");
+                } else {
+                    sender.sendMessage(ChatColor.RED + "You do not have permission.");
+                }
                 break;
             default:
-                sender.sendMessage(ChatColor.RED + "Unknown command!");
+                sender.sendMessage(ChatColor.RED + "Unknown command!  Please report this error!");
         }
         return true;
     }
