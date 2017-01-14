@@ -36,8 +36,8 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
     public void onEnable() {
         try {
             kittedPlayers = new HashSet<>();
-            if (!getDataFolder().isDirectory()) {
-                getDataFolder().mkdirs();
+            if (!getDataFolder().isDirectory() && !getDataFolder().mkdirs()) {
+                getLogger().warning("Unable to create data directory!");
             }
             configFile = new File(getDataFolder(), "config.yml");
             if (!configFile.isFile()) {
