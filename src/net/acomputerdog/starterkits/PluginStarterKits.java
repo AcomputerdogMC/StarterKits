@@ -75,8 +75,8 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
         String uuid = p.getUniqueId().toString();
         if (!kittedPlayers.contains(uuid) && p.hasPermission("starterkits.receive")) {
             try {
-                registerPlayer(uuid);
                 p.getInventory().addItem(kit);
+                registerPlayer(uuid);
             } catch (IOException ex) {
                 getLogger().warning("Exception giving kit to player: " + uuid);
                 ex.printStackTrace();
