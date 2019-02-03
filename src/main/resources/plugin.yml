@@ -1,6 +1,6 @@
-name: StarterKits
-version: 0.3.1
-description: Provides a free kit to new players
+name: ${name}
+version: ${version}
+description: Provides kits of items to new players
 author: acomputerdog
 main: net.acomputerdog.starterkits.PluginStarterKits
 
