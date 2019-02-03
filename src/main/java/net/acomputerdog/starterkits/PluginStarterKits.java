@@ -17,17 +17,41 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+/**
+ * Plugin main class
+ * TODO support multiple kits
+ */
 public class PluginStarterKits extends JavaPlugin implements Listener {
 
+    /**
+     * The kit to provide to players
+     * TODO store in a dedicated data structure
+     */
     private ItemStack[] kit;
+
+    /**
+     * If kits are not enabled, then most plugin code will be skipped for performance
+     */
     private boolean kitsEnabled;
+
+    // TODO look for dedicated bukkit functions
     private File configFile;
-    private File playerFile;
+
+    private File playersFile;
+
+    /**
+     * UUIDs of players who have already received kits
+     * TODO store in database or player data of some kind, this is very inefficient
+     */
     private Set<String> kittedPlayers;
 
     @Override
@@ -37,18 +61,27 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
             if (!getDataFolder().isDirectory() && !getDataFolder().mkdirs()) {
                 getLogger().warning("Unable to create data directory!");
             }
+
+            // create configuration file
             configFile = new File(getDataFolder(), "config.yml");
             if (!configFile.isFile()) {
                 copyConfig();
             }
-            playerFile = new File(getDataFolder(), "players.lst");
-            if (!playerFile.isFile()) {
+            // create database of kitted players
+            playersFile = new File(getDataFolder(), "players.lst");
+            if (!playersFile.isFile()) {
                 savePlayers();
             }
+
+            // read plugin config
             readConfiguration();
+
             //don't register events or load players if they are not needed
             if (kitsEnabled) {
+                // load list of kitted players
                 loadPlayers();
+
+                // register event handlers
                 getServer().getPluginManager().registerEvents(this, this);
             } else {
                 getLogger().info("Kits disabled; not loading players.");
@@ -63,7 +96,7 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
     public void onDisable() {
         kittedPlayers = null;
         configFile = null;
-        playerFile = null;
+        playersFile = null;
         kit = null;
 
         HandlerList.unregisterAll((JavaPlugin) this);
@@ -78,8 +111,7 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
                 p.getInventory().addItem(kit);
                 registerPlayer(uuid);
             } catch (IOException ex) {
-                getLogger().warning("Exception giving kit to player: " + uuid);
-                ex.printStackTrace();
+                getLogger().log(Level.WARNING, "Exception giving kit to player: " + uuid, ex);
                 p.sendMessage(ChatColor.RED + "An exception occurred giving you a starter kit!  Please report this, and/or reconnect to try again.");
             }
         }
@@ -87,76 +119,73 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        switch (command.getName().toLowerCase()) {
-            case "reloadkits":
-                if (sender.hasPermission("starterkits.reload")) {
-                    onDisable();
-                    onEnable();
-                    sender.sendMessage(ChatColor.AQUA + "Reload complete.");
-                    getLogger().info("Reloaded.");
-                } else {
-                    sender.sendMessage(ChatColor.RED + "You do not have permission.");
-                }
-                break;
-            default:
-                sender.sendMessage(ChatColor.RED + "Unknown command!  Please report this error!");
+        String cmd = command.getName().toLowerCase();
+        if ("reloadkits".equals(cmd)) {
+            if (sender.hasPermission("starterkits.reload")) {
+                onDisable();
+                onEnable();
+                sender.sendMessage(ChatColor.AQUA + "Reload complete.");
+                getLogger().info("Reloaded.");
+            } else {
+                sender.sendMessage(ChatColor.RED + "You do not have permission.");
+            }
+        } else {
+            sender.sendMessage(ChatColor.RED + "Unknown command!  Please report this error!");
         }
         return true;
     }
 
+    /**
+     * Registers a player as having received a kit
+     */
     private void registerPlayer(String uuid) throws IOException {
         kittedPlayers.add(uuid);
         savePlayers();
     }
 
     private void loadPlayers() throws IOException {
-        BufferedReader in = null;
-        try {
-            in = new BufferedReader(new FileReader(playerFile));
-            while (in.ready()) {
-                kittedPlayers.add(in.readLine());
-            }
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignored) {}
-            }
+        try (Stream<String> lines = Files.lines(playersFile.toPath())) {
+            kittedPlayers.addAll(lines.collect(Collectors.toList()));
         }
     }
 
+    /**
+     * Saves the kitted players database
+     */
     private void savePlayers() throws IOException {
-        Writer out = null;
-        try {
-            out = new BufferedWriter(new FileWriter(playerFile));
-            for (String uuid : kittedPlayers) {
-                out.write(uuid);
-                out.write("\n");
-            }
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (IOException ignored) {}
-            }
-        }
+        Files.write(playersFile.toPath(), (Iterable<String>) kittedPlayers.stream()::iterator);
     }
 
+    /**
+     * Reads the plugin configuration
+     */
     private void readConfiguration() throws IOException, InvalidConfigurationException {
+        // parse config file
         FileConfiguration conf = new YamlConfiguration();
         conf.load(configFile);
+
+        // if kits are disabled then don't bother with anything
         kitsEnabled = conf.getBoolean("kits_enabled", false);
         if (kitsEnabled) {
+
+            // get kit section
             List<Map<?, ?>> map = conf.getMapList("kit");
+
+            // create item array of correct size
             kit = new ItemStack[map.size()];
+
+            // fill in array from kit section
             for (int i = 0; i < map.size(); i++) {
+                // get each item and its data
                 Map<?, ?> item = map.get(i);
                 String name = (String) item.get("name");
                 int count = (Integer) item.get("count");
-                try {
-                    Material mat = Material.valueOf(name);
-                    kit[i] = new ItemStack(mat, count);
-                } catch (IllegalArgumentException e) {
+
+                // parse item info into an actual item
+                kit[i] = parseItem(name, count);
+
+                // make sure that it was valid
+                if (kit[i] == null) {
                     getLogger().warning("Invalid item name in kit: " + name);
                 }
             }
@@ -165,25 +194,30 @@ public class PluginStarterKits extends JavaPlugin implements Listener {
         }
     }
 
-    private void copyConfig() throws IOException {
-        InputStream in = null;
-        OutputStream out = null;
+    /**
+     * Parses an item name and count into an ItemStack
+     * TODO support more than just item type and count
+     */
+    private ItemStack parseItem(String name, int count) {
         try {
-            in = getClass().getResourceAsStream("/default.yml");
-            out = new FileOutputStream(configFile);
-           while (in.available() > 0) {
-               out.write(in.read());
-           }
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignored) {}
-            }
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (IOException ignored) {}
+            Material mat = Material.valueOf(name);
+            return new ItemStack(mat, count);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private void copyConfig() throws IOException {
+        try (InputStream in = getClass().getResourceAsStream("/default.yml")) {
+            try (OutputStream out = new FileOutputStream(configFile)) {
+
+                byte[] buffer = new byte[1024];
+                int count;
+
+                // copy config file
+                while ((count = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, count);
+                }
             }
         }
     }
