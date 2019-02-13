@@ -3,6 +3,7 @@ version: ${version}
 description: Provides a kit of items to new players
 author: acomputerdog
 main: net.acomputerdog.starterkits.PluginStarterKits
+api-version: 1.13
 
 commands:
   reloadkits:
