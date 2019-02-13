@@ -5,13 +5,13 @@ kits_enabled: false
 
 # The actual kit.  Consists of a hyphenated list of items, which are pairs of item name and count.
 kit:
-  - name: WOOD_PICKAXE
+  - name: WOODEN_PICKAXE
     count: 1
   - name: APPLE
     count: 5
   - name: ENDER_CHEST
     count: 1
-  - name: BED
+  - name: RED_BED
     count: 1
   - name: COMPASS
     count: 1
